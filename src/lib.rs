@@ -1,6 +1,10 @@
+// Language
+
+pub type Value = i32;
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Op {
-    Push(i32),
+    Push(Value),
     Pop,
     Dup,
     Add,
@@ -16,27 +20,95 @@ pub enum TokenizationError {
 #[derive(Debug)]
 pub enum InterpError {
     StackUnderflow,
+    ExecuteValue,
+    ExpectedValue,
 }
 
 pub struct Interp {
-    stack: Vec<Op>,
+    stack: Vec<Value>,
 }
 
 impl Interp {
-    pub fn push(&mut self, op: Op) {
-        todo!()
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
     }
 
-    pub fn pop(&mut self) -> Result<(), InterpError> {
-        todo!()
+    pub fn push(&mut self, value: Value) {
+        self.stack.push(value);
+    }
+
+    pub fn pop(&mut self) -> Result<Value, InterpError> {
+        match self.stack.pop() {
+            Some(value) => Ok(value),
+            None => Err(InterpError::StackUnderflow),
+        }
+    }
+
+    pub fn peek(&self) -> Result<Value, InterpError> {
+        match self.stack.last().clone() {
+            Some(value) => Ok(value.clone()),
+            None => Err(InterpError::StackUnderflow),
+        }
+    }
+
+    pub fn trace(&self) {
+        println!("TRACE: Stack = {}", self.stack.len());
+        self.stack
+            .iter()
+            .enumerate()
+            .rev()
+            .for_each(|(index, item)| {
+                println!("\t[{index}] => {item:?}");
+            });
     }
 
     pub fn exec_op(&mut self, op: Op) -> Result<(), InterpError> {
-        todo!()
+        match op {
+            Op::Push(value) => {
+                self.stack.push(value);
+                Ok(())
+            },
+            Op::Pop => match self.pop() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            },
+            Op::Add => {
+                let a = self.pop()?;
+                let b = self.pop()?;
+                self.push(a + b);
+                Ok(())
+            }
+            Op::Dup => {
+                let op = self.peek()?;
+                self.push(op);
+                Ok(())
+            }
+            Op::Mul => {
+                let a = self.pop()?;
+                let b = self.pop()?;
+                self.push(a * b);
+                Ok(())
+            }
+            Op::Print => {
+                let op = self.pop();
+                println!("Example print: {:?}", op);
+                Ok(())
+            }
+        }
     }
 
-    pub fn exec(&mut self) -> Result<(), InterpError> {
-        todo!()
+    pub fn exec(&mut self, code: &[Op]) -> Result<(), InterpError> {
+        let mut counter = 0;
+        code.iter().map(|op| *op).try_for_each(|op| {
+            println!("EXEC: [{counter}] => {op:?}");
+            self.trace();
+
+            self.exec_op(op)?;
+
+            println!("");
+            counter += 1;
+            Ok(())
+        })
     }
 }
 
@@ -57,6 +129,23 @@ pub fn tokenize(string: &str) -> Result<Vec<Op>, TokenizationError> {
         })
         .collect::<Result<Vec<Op>, TokenizationError>>()
 }
+
+// Run
+
+pub fn run(string: &str) -> Result<(), ()> {
+    match tokenize(string) {
+        Ok(code) => {
+            let mut interp = Interp::new();
+            if let Err(err) = interp.exec(&code) {
+                eprintln!("ERROR: Interpretter failed, reason: {err:?}");
+            }
+        }
+        Err(err) => eprintln!("ERROR: Tokenization failed, reason: {err:?}"),
+    }
+    Err(())
+}
+
+// Tests
 
 #[cfg(test)]
 mod tests {
